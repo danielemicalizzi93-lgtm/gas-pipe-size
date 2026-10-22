@@ -1,0 +1,49 @@
+{
+  "summary": "First test run of Gas Pipe Sizing (UNI 7129) app. Backend: 18/18 pytest cases pass after fix. Fixed CRITICAL bug where MongoDB `_id` was leaking in POST/GET/LIST /api/calculations responses instead of `id` (would have broken frontend history navigation). Frontend: full happy path works end-to-end on mobile viewport 390x844 — gas segmented (Metano/GPL), material (Acciaio/Rame/Multistrato), length input, fittings chips (0/10/20/30), add-appliance modal with presets & custom, total-power updates, calculate, result diameter + Δp, save -> 'Salvato nello storico', history list, detail with URL id, delete confirm & return. GPL yields smaller/equal diameter than Metano for same input (verified). Deprecated package detected: `expo-router/unstable-native-tabs` → migrate to `expo-router/native-tabs`.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST/GET/LIST /api/calculations",
+        "issue": "FIXED by tester: FastAPI was serializing Calculation model with alias (`_id`) instead of field name (`id`). Added response_model_by_alias=False to the three endpoints in /app/backend/server.py. Without the fix, FlatList keyExtractor and router.push(`/history/${item.id}`) in /app/frontend/app/(tabs)/history.tsx would receive undefined and break navigation.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "expo-router/unstable-native-tabs",
+        "issue": "Deprecated import detected at runtime (console warning: '`expo-router/unstable-native-tabs` is deprecated. Use `expo-router/native-tabs` instead.'). Reference: likely in /app/frontend/app/(tabs)/_layout.tsx or /app/frontend/src/navigation.*"
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_gas_sizing.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Migrate from `expo-router/unstable-native-tabs` to `expo-router/native-tabs` in the tabs layout to clear the deprecation warning.",
+    "(Optional) Consider renaming the Pydantic field to drop the `_id` alias and use a Field validator/serializer pattern instead of relying on response_model_by_alias=False, for cleaner API models."
+  ],
+  "critical_code_review_comments": [
+    "server.py: BaseDocument uses `Field(default=None, alias='_id')` with populate_by_name — FastAPI's default response serialization uses by_alias=True for Pydantic v2 aliased fields, causing `_id` leak. Fixed by adding response_model_by_alias=False on all 3 persistence endpoints.",
+    "server.py uses deprecated `@app.on_event('shutdown')` — consider migrating to FastAPI lifespan context managers.",
+    "history.tsx uses `keyExtractor={(i) => i.id}` which depends on the `id` field being present — now guaranteed by the fix."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (added response_model_by_alias=False to 3 /api/calculations endpoints)",
+    "/app/backend/tests/test_gas_sizing.py (new)",
+    "/app/backend/tests/conftest.py (new)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% (full happy path incl. GPL/Rame calc, save, history list, detail, delete)"},
+  "seed_data_creation": "No persistent seed data. All TEST_-prefixed calculations created during testing were cleaned up.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend uses EXPO_PUBLIC_BACKEND_URL (not EXPO_BACKEND_URL) in frontend/.env. Public base URL: https://gas-pipe-sizing.preview.emergentagent.com. Mobile viewport 390x844. In the appliance modal, preset items may require scroll_into_view_if_needed() before click because the bottom-sheet ScrollView extends beyond viewport. Navigation between tabs can use text 'Storico'/'Calcola' or testID `tab-storico` (web may not expose tabBarButtonTestID as data-testid reliably).",
+  "rca_of_issue": "Root cause of _id leak: In Pydantic v2, when a model field is declared with an alias (`alias='_id'`), FastAPI's default response serialization uses `by_alias=True` (confirmed by curl output). The to_mongo() helper excludes `id` and the DB insert produces an ObjectId; `calc.id = str(res.inserted_id)` populates the field, but the response goes out under the alias name. Mitigation: set `response_model_by_alias=False` on each endpoint using the Calculation response model. Verified fix: all tests pass and FE history navigation works end-to-end."
+}

@@ -1,0 +1,149 @@
+{
+  "app_name": "GasCalc Pro",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A highly readable, industrial-grade engineering calculator that prioritizes functional clarity and precise data entry without feeling sterile.",
+  "color": {
+    "surface": "#FAFAFA",
+    "onSurface": "#171717",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#262626",
+    "surfaceTertiary": "#F0F0F0",
+    "onSurfaceTertiary": "#404040",
+    "surfaceInverse": "#171717",
+    "onSurfaceInverse": "#FAFAFA",
+    "brand": "#C2410C",
+    "brandPrimary": "#C2410C",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#FED7AA",
+    "onBrandSecondary": "#9A3412",
+    "brandTertiary": "#FFEDD5",
+    "onBrandTertiary": "#C2410C",
+    "success": "#15803D",
+    "onSuccess": "#FFFFFF",
+    "warning": "#B45309",
+    "onWarning": "#FFFFFF",
+    "error": "#B91C1C",
+    "onError": "#FFFFFF",
+    "info": "#0F766E",
+    "onInfo": "#FFFFFF",
+    "border": "#E5E7EB",
+    "borderStrong": "#D1D5DB",
+    "divider": "#F5F5F5",
+    "muted": "#737373",
+    "onBrand": "#FFFFFF"
+  },
+  "typography": {
+    "displayFontFamily": "Plus Jakarta Sans",
+    "textFontFamily": "Geist",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous vertical breathing room for input fields to prevent tap errors. Strict adherence to safe areas and padding.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": 1,
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Use glass on the bottom tab bar.",
+      "Use glass on the sticky 'Calcola' CTA container at the bottom of the calculator screen.",
+      "Use frosted glass on the result modal header."
+    ],
+    "dont's": [
+      "Do not use glass on input fields, cards, or standard list rows."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Calculator",
+      "purpose": "Primary workspace for sizing a gas pipe by inputting material, length, and connected appliances.",
+      "states": {
+        "loading": "Centered spinner",
+        "empty": "Not applicable; form starts with default selections.",
+        "error": "Standard alert toast for missing/invalid inputs."
+      },
+      "layout": "Sticky header. Segmented controls (Metano/GPL and Material) in a surfaceSecondary card. A large numeric text input for 'Lunghezza (m)'. A section titled 'Apparecchi' displaying a list of added items (e.g. Caldaia, 24kW) with a prominent 'Aggiungi Apparecchio' button. Sticky CTA 'Calcola' pinned at the bottom in a glass container over scrollable content."
+    },
+    {
+      "name": "ApplianceSelector (BottomSheet)",
+      "purpose": "Quickly add standard appliances and their thermal power to the calculation.",
+      "states": {
+        "loading": "N/A",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "A bottom sheet listing common appliances (Caldaia, Piano Cottura, Scaldabagno) with default kW values, and a 'Personalizzato' option to enter custom kW. Uses large touch targets."
+    },
+    {
+      "name": "Result",
+      "purpose": "Displays the final calculated diameter and pressure drop.",
+      "states": {
+        "loading": "Skeleton of the result card.",
+        "empty": "N/A",
+        "error": "Error state if calculation exceeds table limits (e.g., length too long)."
+      },
+      "layout": "A full-screen modal or sheet. Features a large, elevated card showing the recommended diameter in huge mono typography. Below it, secondary metrics like 'Caduta di pressione'. A 'Salva nello storico' primary CTA at the bottom."
+    },
+    {
+      "name": "History",
+      "purpose": "View previously saved calculations for reference.",
+      "states": {
+        "loading": "List skeleton.",
+        "empty": "Illustration of an empty folder with 'Nessun calcolo salvato' and a CTA 'Nuovo Calcolo'.",
+        "error": "Retry button."
+      },
+      "layout": "A vertical list of surfaceSecondary cards showing Date, Gas type, Material, and calculated Diameter. Clean and scannable."
+    }
+  ],
+  "images": {
+    "hero_background": {
+      "url": "https://images.pexels.com/photos/4458205/pexels-photo-4458205.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Architectural floor plan with technical elements used as a subtle background texture"
+    },
+    "empty_history": {
+      "url": "https://images.pexels.com/photos/8947698/pexels-photo-8947698.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Minimalist plain cardboard folder representing an empty state"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Ensure 'brand' color is strictly Burnt Orange (#C2410C) and never blue or purple, adhering strictly to the <Colors> anti-pattern rules.",
+    "Implement the sticky CTA 'Calcola' pattern on the Calculator screen. It must sit outside the scroll view in a glass container at the bottom, respecting safe areas.",
+    "Use mono font (Space Mono or JetBrains Mono if added, or rely on a standard monospace fallback for numeric displays) for critical numbers like total kW, Pipe Length, and Calculated Diameter.",
+    "Calculations must follow UNI 7129 tables logically (Max pressure drop 1 mbar for methane, 2 mbar for LPG).",
+    "Use Phosphor icons. Outline for inactive tabs, Filled for active tabs.",
+    "For the History screen empty state, use the `empty_history` image with a gradient-to-dark scrim pattern if text overlays it, or place it cleanly as an inline image.",
+    "Ensure the calculation button is disabled or handles validation gracefully if length is 0 or no appliances are added."
+  ]
+}
