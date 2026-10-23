@@ -20,6 +20,10 @@ export default function TabsLayout() {
           <NativeTabs.Trigger.Icon sf="clock.fill" />
           <NativeTabs.Trigger.Label>Storico</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="profile">
+          <NativeTabs.Trigger.Icon sf="person.crop.circle.fill" />
+          <NativeTabs.Trigger.Label>Profilo</NativeTabs.Trigger.Label>
+        </NativeTabs.Trigger>
       </NativeTabs>
     );
   }
@@ -56,6 +60,16 @@ export default function TabsLayout() {
           tabBarButtonTestID: "tab-storico",
           tabBarIcon: ({ color, focused }) => (
             <MaterialDesignIcons name={focused ? "history" : "clock-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profilo",
+          tabBarButtonTestID: "tab-profilo",
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialDesignIcons name={focused ? "account-hard-hat" : "account-hard-hat-outline"} size={24} color={color} />
           ),
         }}
       />

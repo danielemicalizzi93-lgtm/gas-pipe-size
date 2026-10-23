@@ -43,7 +43,7 @@ export default function HistoryScreen() {
           data={q.data}
           keyExtractor={(i) => i.id}
           contentContainerStyle={[styles.list, { paddingBottom: bottomChrome + spacing.xl }]}
-          refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={q.refetch} tintColor={colors.brandPrimary} />}
+          refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => void q.refetch()} tintColor={colors.brandPrimary} />}
           ListEmptyComponent={
             <View style={styles.empty} testID="history-empty">
               <Image source={{ uri: EMPTY_IMG }} style={styles.emptyImg} contentFit="cover" transition={300} />
@@ -71,9 +71,13 @@ export default function HistoryScreen() {
                     {item.name}
                   </Text>
                   <Text style={styles.meta}>
-                    {GAS_LABELS[item.input.gas]} · {MATERIAL_LABELS[item.input.material]} · {item.input.length_m} m ·{" "}
-                    {item.result.total_power_kw} kW
+                    {GAS_LABELS[item.input.gas]} · {MATERIAL_LABELS[item.input.material]} ·{" "}
+                    {item.input.segments.length > 1
+                      ? `${item.input.segments.length} tratti`
+                      : `${item.input.segments[0].length_m} m`}{" "}
+                    · {item.result.total_power_kw} kW
                   </Text>
+                  {!!item.client_name && <Text style={styles.meta} numberOfLines={1}>Cliente: {item.client_name}</Text>}
                   <Text style={styles.date}>{new Date(item.created_at).toLocaleString("it-IT")}</Text>
                 </View>
                 <MaterialDesignIcons name="chevron-right" size={22} color={colors.muted} />

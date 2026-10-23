@@ -66,6 +66,7 @@ export function ApplianceModal({ visible, onClose, onAdd }: Props) {
             <Text style={[styles.section, { marginTop: spacing.lg }]}>PERSONALIZZATO</Text>
             <TextInput
               testID="custom-name-input"
+              maxLength={60}
               style={styles.input}
               placeholder="Nome apparecchio"
               placeholderTextColor={colors.muted}

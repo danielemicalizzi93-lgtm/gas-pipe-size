@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api } from "@/src/api";
 import { ResultView } from "@/src/components/result-view";
+import { shareReport } from "@/src/pdf";
+import { useDraft } from "@/src/store/draft";
 import { makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
 export default function HistoryDetail() {
@@ -17,11 +19,24 @@ export default function HistoryDetail() {
   const qc = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [confirm, setConfirm] = useState(false);
+  const loadCalculation = useDraft((s) => s.loadCalculation);
 
   const q = useQuery({ queryKey: ["calculation", id], queryFn: () => api.get(id) });
+  const pdf = useMutation({
+    mutationFn: () => shareReport(
+      { name: q.data!.name, client_name: q.data!.client_name, site_address: q.data!.site_address },
+      q.data!.input,
+      q.data!.result,
+    ),
+  });
+  const openInCalculator = (mode: "edit" | "duplicate") => {
+    loadCalculation(q.data!, mode);
+    router.dismissTo("/");
+  };
   const del = useMutation({
     mutationFn: () => api.remove(id),
     onSuccess: async () => {
+      if (useDraft.getState().editingId === id) useDraft.getState().reset();
       await qc.invalidateQueries({ queryKey: ["calculations"] });
       setConfirm(false);
       router.back();
@@ -55,6 +70,33 @@ export default function HistoryDetail() {
       {q.data && (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}>
           <Text style={styles.date}>Salvato il {new Date(q.data.created_at).toLocaleString("it-IT")}</Text>
+          {(!!q.data.client_name || !!q.data.site_address) && (
+            <View style={styles.clientCard} testID="detail-client">
+              {!!q.data.client_name && <Text style={styles.clientName}>{q.data.client_name}</Text>}
+              {!!q.data.site_address && <Text style={styles.muted}>{q.data.site_address}</Text>}
+            </View>
+          )}
+          <View style={styles.actions}>
+            <Pressable style={styles.action} onPress={() => openInCalculator("edit")} testID="detail-edit">
+              <MaterialDesignIcons name="pencil-outline" size={20} color={colors.brandPrimary} />
+              <Text style={styles.actionText}>Modifica</Text>
+            </Pressable>
+            <Pressable style={styles.action} onPress={() => openInCalculator("duplicate")} testID="detail-duplicate">
+              <MaterialDesignIcons name="content-copy" size={20} color={colors.brandPrimary} />
+              <Text style={styles.actionText}>Duplica</Text>
+            </Pressable>
+            <Pressable style={[styles.action, styles.actionDark]} onPress={() => pdf.mutate()} testID="detail-pdf" disabled={pdf.isPending}>
+              {pdf.isPending ? (
+                <ActivityIndicator color={colors.onSurfaceInverse} />
+              ) : (
+                <>
+                  <MaterialDesignIcons name="file-pdf-box" size={20} color={colors.onSurfaceInverse} />
+                  <Text style={[styles.actionText, { color: colors.onSurfaceInverse }]}>PDF</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+          {pdf.isError && <Text style={[styles.muted, { color: colors.error }]}>Impossibile generare il PDF.</Text>}
           <ResultView input={q.data.input} result={q.data.result} />
         </ScrollView>
       )}
@@ -97,6 +139,23 @@ const useStyles = makeStyles((c) => ({
   content: { padding: spacing.lg, gap: spacing.md },
   date: { fontSize: 13, color: c.muted },
   muted: { fontSize: 14, color: c.muted },
+  clientCard: { backgroundColor: c.surfaceSecondary, borderWidth: 1, borderColor: c.border, borderRadius: radius.md, padding: spacing.md, gap: 2 },
+  clientName: { fontSize: 15, fontWeight: "700", color: c.onSurface },
+  actions: { flexDirection: "row", gap: spacing.sm },
+  action: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: c.brandPrimary,
+    backgroundColor: c.brandTertiary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+  },
+  actionDark: { backgroundColor: c.surfaceInverse, borderColor: c.surfaceInverse },
+  actionText: { fontSize: 14, fontWeight: "700", color: c.brandPrimary },
   backdrop: { flex: 1, backgroundColor: c.scrim, justifyContent: "flex-end" },
   sheet: {
     backgroundColor: c.surfaceSecondary,

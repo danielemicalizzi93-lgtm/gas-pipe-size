@@ -39,7 +39,16 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-status-bar",
-      "@react-native-vector-icons/material-design-icons"
+      "@react-native-vector-icons/material-design-icons",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Scegli il logo da stampare sulle relazioni",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, GAS_LABELS, MATERIAL_LABELS, type CalcInput } from "@/src/api";
 import { ResultView } from "@/src/components/result-view";
+import { shareReport } from "@/src/pdf";
+import { useDraft } from "@/src/store/draft";
 import { makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
 export default function ResultScreen() {
@@ -18,19 +20,31 @@ export default function ResultScreen() {
   const qc = useQueryClient();
   const params = useLocalSearchParams<{ input: string }>();
   const input = useMemo(() => JSON.parse(params.input) as CalcInput, [params.input]);
+  const editingId = useDraft((s) => s.editingId);
+  const draftMeta = useDraft((s) => s.meta);
+  const setDraftMeta = useDraft((s) => s.setMeta);
+  const setEditingId = useDraft((s) => s.setEditingId);
+  const totalLen = Math.round(input.segments.reduce((s, x) => s + x.length_m, 0) * 100) / 100;
   const [name, setName] = useState(
-    `${GAS_LABELS[input.gas]} · ${MATERIAL_LABELS[input.material]} · ${input.length_m} m`,
+    draftMeta.name || `${GAS_LABELS[input.gas]} · ${MATERIAL_LABELS[input.material]} · ${totalLen} m`,
   );
+  const [client, setClient] = useState(draftMeta.client_name);
+  const [address, setAddress] = useState(draftMeta.site_address);
   const [saved, setSaved] = useState(false);
+  const meta = { name: name.trim(), client_name: client.trim(), site_address: address.trim() };
 
   const q = useQuery({ queryKey: ["calculate", params.input], queryFn: () => api.calculate(input) });
   const save = useMutation({
-    mutationFn: () => api.save(name.trim(), input),
-    onSuccess: () => {
+    mutationFn: (asNew: boolean) => (editingId && !asNew ? api.update(editingId, meta, input) : api.save(meta, input)),
+    onSuccess: (calc) => {
       setSaved(true);
+      if (editingId) setEditingId(calc.id);
+      setDraftMeta(meta);
       qc.invalidateQueries({ queryKey: ["calculations"] });
+      qc.invalidateQueries({ queryKey: ["calculation", calc.id] });
     },
   });
+  const pdf = useMutation({ mutationFn: () => shareReport(meta, input, q.data!) });
 
   return (
     <View style={styles.root}>
@@ -67,17 +81,37 @@ export default function ResultScreen() {
             <Text style={styles.saveLabel}>Nome del calcolo</Text>
             <TextInput
               testID="save-name-input"
+              maxLength={80}
               style={styles.input}
               value={name}
               onChangeText={setName}
-              editable={!saved}
               placeholderTextColor={colors.muted}
               placeholder="Es. Appartamento Rossi"
+            />
+            <Text style={styles.saveLabel}>Cliente</Text>
+            <TextInput
+              testID="save-client-input"
+              maxLength={100}
+              style={styles.input}
+              value={client}
+              onChangeText={setClient}
+              placeholderTextColor={colors.muted}
+              placeholder="Nome e cognome del cliente"
+            />
+            <Text style={styles.saveLabel}>Indirizzo cantiere</Text>
+            <TextInput
+              testID="save-address-input"
+              maxLength={200}
+              style={styles.input}
+              value={address}
+              onChangeText={setAddress}
+              placeholderTextColor={colors.muted}
+              placeholder="Via, città"
             />
             <Pressable
               testID="save-button"
               disabled={saved || save.isPending || !name.trim()}
-              onPress={() => save.mutate()}
+              onPress={() => save.mutate(false)}
               style={[styles.saveBtn, saved && styles.saveBtnDone, (!name.trim() || save.isPending) && { opacity: 0.5 }]}
             >
               {save.isPending ? (
@@ -89,11 +123,39 @@ export default function ResultScreen() {
                     size={20}
                     color={colors.onBrandPrimary}
                   />
-                  <Text style={styles.saveText}>{saved ? "Salvato nello storico" : "Salva nello storico"}</Text>
+                  <Text style={styles.saveText}>
+                    {saved ? "Salvato nello storico" : editingId ? "Aggiorna calcolo" : "Salva nello storico"}
+                  </Text>
                 </>
               )}
             </Pressable>
+            {editingId && !saved && (
+              <Pressable
+                testID="save-as-new-button"
+                disabled={save.isPending || !name.trim()}
+                onPress={() => save.mutate(true)}
+                style={styles.secondaryBtn}
+              >
+                <Text style={styles.secondaryText}>Salva come nuovo</Text>
+              </Pressable>
+            )}
             {save.isError && <Text style={styles.errText}>Salvataggio non riuscito, riprova.</Text>}
+            <Pressable
+              testID="share-pdf-button"
+              disabled={pdf.isPending}
+              onPress={() => pdf.mutate()}
+              style={[styles.pdfBtn, pdf.isPending && { opacity: 0.6 }]}
+            >
+              {pdf.isPending ? (
+                <ActivityIndicator color={colors.onSurfaceInverse} />
+              ) : (
+                <>
+                  <MaterialDesignIcons name="file-pdf-box" size={22} color={colors.onSurfaceInverse} />
+                  <Text style={styles.pdfText}>Relazione PDF / Condividi</Text>
+                </>
+              )}
+            </Pressable>
+            {pdf.isError && <Text style={styles.errText}>Impossibile generare il PDF.</Text>}
           </View>
         </KeyboardAwareScrollView>
       )}
@@ -142,4 +204,17 @@ const useStyles = makeStyles((c) => ({
   },
   saveBtnDone: { backgroundColor: c.success },
   saveText: { color: c.onBrandPrimary, fontSize: 16, fontWeight: "700" },
+  secondaryBtn: { minHeight: 44, alignItems: "center", justifyContent: "center", marginTop: spacing.xs },
+  secondaryText: { color: c.brandPrimary, fontWeight: "700", fontSize: 15 },
+  pdfBtn: {
+    marginTop: spacing.md,
+    minHeight: 52,
+    borderRadius: radius.md,
+    backgroundColor: c.surfaceInverse,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
+  pdfText: { color: c.onSurfaceInverse, fontSize: 16, fontWeight: "700" },
 }));

@@ -15,12 +15,16 @@
 - Frontend Expo Router: tabs (Calcola, Storico), modal /result, /history/[id].
 
 ## Implemented (2026-06)
+- Multi-segment network (tratti/diramazioni) sized with the UNI 7129 table method: each segment uses its own flow and the total length from the meter to the farthest appliance; cumulative Δp shown for each segment
+- Technical PDF report (expo-print + expo-sharing) with installer logo/data, client and site address, segment table and verdict; on web it opens a print window
+- Edit (PUT) / duplicate saved calculations through a zustand draft store
+- Installer profile tab with logo stored in Emergent Object Storage
+- Tested: backend 38/38, frontend flows (iteration 2); fixes applied for edit state after delete, web print, maxLength, touch targets
 - Calculator with gas/material selectors, length, fittings allowance (0–30%), appliance modal (presets + custom)
 - Result: recommended diameter, Δp, flow, velocity, verification table for all sizes
 - Save to history, list, detail, delete
 - Tested: backend 18/18, frontend happy path
 
 ## Backlog
-- P1: PDF report/export & share
-- P1: Multi-segment (tratti) network calculation
-- P2: Edit/duplicate saved calc, medium pressure ranges
+- P1: Medium pressure ranges, fitting-by-fitting equivalent lengths
+- P2: Network diagram view, multiple installer profiles

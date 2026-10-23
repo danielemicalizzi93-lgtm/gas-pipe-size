@@ -8,13 +8,16 @@ import { makeStyles, mono, radius, spacing, useTheme } from "@/src/theme";
 export function ResultView({ input, result }: { input: CalcInput; result: CalcResult }) {
   const styles = useStyles();
   const { colors } = useTheme();
-  const rec = result.recommended;
+  const rec = result.ok ? result.recommended : null;
+  const multi = result.segments.length > 1;
+  const allApps = input.segments.flatMap((s) => s.appliances);
+  const nameOf = (id: string | null) => (id ? (result.segments.find((s) => s.id === id)?.name ?? "-") : "Contatore");
 
   return (
     <View style={styles.wrap}>
       {rec ? (
         <Animated.View entering={ZoomIn.duration(350)} style={styles.hero} testID="result-recommended">
-          <Text style={styles.heroLabel}>DIAMETRO CONSIGLIATO</Text>
+          <Text style={styles.heroLabel}>{multi ? "TRATTO PRINCIPALE" : "DIAMETRO CONSIGLIATO"}</Text>
           <Text style={styles.heroValue} testID="result-diameter">
             {rec.nominal}
           </Text>
@@ -24,7 +27,8 @@ export function ResultView({ input, result }: { input: CalcInput; result: CalcRe
           <View style={styles.badge}>
             <MaterialDesignIcons name="check-circle" size={16} color={colors.success} />
             <Text style={styles.badgeText} testID="result-drop">
-              Δp {rec.pressure_drop_mbar.toFixed(2)} mbar ≤ {result.max_drop_mbar} mbar
+              Δp {multi ? "max " : ""}
+              {(result.max_cumulative_drop_mbar ?? rec.pressure_drop_mbar).toFixed(2)} mbar ≤ {result.max_drop_mbar} mbar
             </Text>
           </View>
         </Animated.View>
@@ -42,12 +46,39 @@ export function ResultView({ input, result }: { input: CalcInput; result: CalcRe
       <Animated.View entering={FadeInDown.delay(100)} style={styles.metrics}>
         <Metric label="Potenza totale" value={`${result.total_power_kw} kW`} testID="metric-power" />
         <Metric label="Portata gas" value={`${result.flow_m3h} m³/h`} testID="metric-flow" />
-        <Metric label="Lungh. equivalente" value={`${result.equivalent_length_m} m`} testID="metric-length" />
+        <Metric label="Lungh. di calcolo" value={`${result.equivalent_length_m} m`} testID="metric-length" />
         <Metric label="Gas" value={result.gas_label} testID="metric-gas" />
         {rec && <Metric label="Velocità" value={`${rec.velocity_ms} m/s`} testID="metric-velocity" />}
         <Metric label="Raccordi" value={`+${input.fittings_pct}%`} testID="metric-fittings" />
       </Animated.View>
 
+      {multi && (
+        <Animated.View entering={FadeInDown.delay(140)} style={styles.card} testID="segments-table">
+          <Text style={styles.cardTitle}>Dimensionamento tratti</Text>
+          {result.segments.map((s, i) => (
+            <View key={s.id} style={styles.segRow} testID={`segment-result-${i}`}>
+              <View style={styles.flex1}>
+                <Text style={styles.segName} numberOfLines={1}>
+                  {s.name}
+                </Text>
+                <Text style={styles.segMeta}>
+                  da {nameOf(s.parent_id)} · {s.length_m} m · {s.power_kw} kW
+                </Text>
+              </View>
+              <View style={styles.segRight}>
+                <Text style={[styles.segDiam, !s.recommended && s.flow_m3h > 0 && { color: colors.error }]}>
+                  {s.recommended ? s.recommended.nominal : s.flow_m3h > 0 ? "N.D." : "—"}
+                </Text>
+                <Text style={styles.segMeta}>
+                  {s.cumulative_drop_mbar !== null ? `Σ ${s.cumulative_drop_mbar.toFixed(2)} mbar` : ""}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </Animated.View>
+      )}
+
+      {!multi && (
       <Animated.View entering={FadeInDown.delay(180)} style={styles.card}>
         <Text style={styles.cardTitle}>Verifica per diametro</Text>
         <View style={[styles.tr, styles.thRow]}>
@@ -76,10 +107,11 @@ export function ResultView({ input, result }: { input: CalcInput; result: CalcRe
           );
         })}
       </Animated.View>
+      )}
 
       <Animated.View entering={FadeInDown.delay(240)} style={styles.card}>
-        <Text style={styles.cardTitle}>Apparecchi ({input.appliances.length})</Text>
-        {input.appliances.map((a, i) => (
+        <Text style={styles.cardTitle}>Apparecchi ({allApps.length})</Text>
+        {allApps.map((a, i) => (
           <View key={i} style={styles.appRow}>
             <Text style={styles.appName}>{a.name}</Text>
             <Text style={styles.appKw}>{a.power_kw} kW</Text>
@@ -160,4 +192,10 @@ const useStyles = makeStyles((c) => ({
   appName: { fontSize: 14, color: c.onSurface, flex: 1 },
   appKw: { fontFamily: mono, fontSize: 14, color: c.onSurfaceSecondary },
   note: { fontSize: 12, color: c.muted, lineHeight: 18 },
+  flex1: { flex: 1 },
+  segRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: c.divider },
+  segName: { fontSize: 15, fontWeight: "600", color: c.onSurface },
+  segMeta: { fontSize: 12, color: c.muted, marginTop: 2 },
+  segRight: { alignItems: "flex-end" },
+  segDiam: { fontFamily: mono, fontSize: 18, fontWeight: "800", color: c.brandPrimary },
 }));

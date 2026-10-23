@@ -5,12 +5,44 @@ export type Material = "acciaio" | "rame" | "multistrato";
 
 export type Appliance = { name: string; power_kw: number };
 
+export type Segment = {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  length_m: number;
+  appliances: Appliance[];
+};
+
 export type CalcInput = {
   gas: GasType;
   material: Material;
-  length_m: number;
   fittings_pct: number;
-  appliances: Appliance[];
+  segments: Segment[];
+};
+
+export type SegmentResult = {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  length_m: number;
+  power_kw: number;
+  flow_m3h: number;
+  recommended: PipeOption | null;
+  cumulative_drop_mbar: number | null;
+};
+
+export type SaveMeta = { name: string; client_name: string; site_address: string };
+
+export type Profile = {
+  full_name: string;
+  company: string;
+  address: string;
+  phone: string;
+  email: string;
+  vat: string;
+  license: string;
+  has_logo?: boolean;
+  logo_version?: string | null;
 };
 
 export type PipeOption = {
@@ -30,14 +62,17 @@ export type CalcResult = {
   max_drop_mbar: number;
   recommended: PipeOption | null;
   options: PipeOption[];
+  segments: SegmentResult[];
+  max_cumulative_drop_mbar: number | null;
+  ok: boolean;
 };
 
-export type Calculation = {
+export type Calculation = SaveMeta & {
   id: string;
-  name: string;
   input: CalcInput;
   result: CalcResult;
   created_at: string;
+  updated_at?: string | null;
 };
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -49,13 +84,22 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export const LOGO_URL = `${BASE}/profile/logo`;
+export const LOGO_UPLOAD_URL = `${BASE}/profile/logo`;
+
 export const api = {
   calculate: (input: CalcInput) => req<CalcResult>("/calculate", { method: "POST", body: JSON.stringify(input) }),
-  save: (name: string, input: CalcInput) =>
-    req<Calculation>("/calculations", { method: "POST", body: JSON.stringify({ name, input }) }),
+  save: (meta: SaveMeta, input: CalcInput) =>
+    req<Calculation>("/calculations", { method: "POST", body: JSON.stringify({ ...meta, input }) }),
+  update: (id: string, meta: SaveMeta, input: CalcInput) =>
+    req<Calculation>(`/calculations/${id}`, { method: "PUT", body: JSON.stringify({ ...meta, input }) }),
   list: () => req<Calculation[]>("/calculations"),
   get: (id: string) => req<Calculation>(`/calculations/${id}`),
   remove: (id: string) => req<{ ok: boolean }>(`/calculations/${id}`, { method: "DELETE" }),
+  profile: () => req<Profile>("/profile"),
+  saveProfile: (p: Profile) => req<Profile>("/profile", { method: "PUT", body: JSON.stringify(p) }),
+  removeLogo: () => req<Profile>("/profile/logo", { method: "DELETE" }),
+  logoData: () => req<{ data_uri: string }>("/profile/logo-data"),
 };
 
 export const GAS_LABELS: Record<GasType, string> = { metano: "Metano", gpl: "GPL" };

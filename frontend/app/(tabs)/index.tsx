@@ -1,15 +1,16 @@
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import Animated, { FadeInDown, FadeOut, LinearTransition } from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { Appliance, CalcInput, GasType, Material } from "@/src/api";
 import { ApplianceModal } from "@/src/components/appliance-modal";
+import { SegmentCard } from "@/src/components/segment-card";
 import { Segmented } from "@/src/components/segmented";
 import { usesNativeTabs } from "@/src/navigation";
+import { draftToInput, parseNum, useDraft } from "@/src/store/draft";
 import { makeStyles, mono, radius, spacing, useTheme } from "@/src/theme";
 
 const FITTINGS = [0, 10, 20, 30];
@@ -21,27 +22,38 @@ export default function CalculatorScreen() {
   const router = useRouter();
   const bottomChrome = usesNativeTabs ? insets.bottom : 0;
 
-  const [gas, setGas] = useState<GasType>("metano");
-  const [material, setMaterial] = useState<Material>("acciaio");
-  const [length, setLength] = useState("");
-  const [fittings, setFittings] = useState(0);
-  const [appliances, setAppliances] = useState<Appliance[]>([]);
-  const [modal, setModal] = useState(false);
+  const d = useDraft();
+  const { gas, material, fittings, segments, setGas, setMaterial, setFittings } = d;
+  const [modalSeg, setModalSeg] = useState<string | null>(null);
 
-  const lengthNum = parseFloat(length.replace(",", "."));
-  const total = appliances.reduce((s, a) => s + a.power_kw, 0);
-  const valid = lengthNum > 0 && appliances.length > 0;
+  const total = segments.reduce((s, x) => s + x.appliances.reduce((a, b) => a + b.power_kw, 0), 0);
+  const valid = segments.every((x) => parseNum(x.length) > 0 && parseNum(x.length) <= 500) && total > 0;
 
   const calc = () => {
-    const input: CalcInput = { gas, material, length_m: lengthNum, fittings_pct: fittings, appliances };
-    router.push({ pathname: "/result", params: { input: JSON.stringify(input) } });
+    router.push({ pathname: "/result", params: { input: JSON.stringify(draftToInput(d)) } });
   };
 
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <Text style={styles.overline}>UNI 7129 · BASSA PRESSIONE</Text>
-        <Text style={styles.title}>Dimensionamento gas</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Dimensionamento gas</Text>
+          <Pressable onPress={d.reset} hitSlop={10} testID="reset-button" style={styles.resetBtn}>
+            <MaterialDesignIcons name="refresh" size={22} color={colors.muted} />
+          </Pressable>
+        </View>
+        {d.editingId && (
+          <View style={styles.editBanner} testID="editing-banner">
+            <MaterialDesignIcons name="pencil" size={16} color={colors.onBrandTertiary} />
+            <Text style={styles.editText} numberOfLines={1}>
+              Modifica: {d.meta.name}
+            </Text>
+            <Pressable onPress={d.reset} hitSlop={10} testID="cancel-edit-button">
+              <Text style={styles.editCancel}>Annulla</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
 
       <KeyboardAwareScrollView
@@ -75,20 +87,7 @@ export default function CalculatorScreen() {
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(80).duration(300)} style={styles.card}>
-          <Text style={styles.label}>Lunghezza tubazione</Text>
-          <View style={styles.lengthRow}>
-            <TextInput
-              testID="length-input"
-              style={styles.lengthInput}
-              value={length}
-              onChangeText={setLength}
-              placeholder="0"
-              placeholderTextColor={colors.borderStrong}
-              keyboardType="decimal-pad"
-            />
-            <Text style={styles.unit}>m</Text>
-          </View>
-          <Text style={[styles.label, { marginTop: spacing.md }]}>Maggiorazione raccordi/curve</Text>
+          <Text style={styles.label}>Maggiorazione raccordi/curve</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
             {FITTINGS.map((f) => {
               const active = f === fittings;
@@ -106,51 +105,36 @@ export default function CalculatorScreen() {
           </ScrollView>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(160).duration(300)} style={styles.card}>
-          <View style={styles.appHeader}>
-            <Text style={styles.label}>Apparecchi</Text>
-            <Text style={styles.total} testID="total-power">
-              {total.toFixed(1)} kW
-            </Text>
-          </View>
-          {appliances.length === 0 && (
-            <Text style={styles.empty} testID="appliances-empty">
-              Nessun apparecchio. Aggiungi caldaia, piano cottura, ecc.
-            </Text>
-          )}
-          {appliances.map((a, i) => (
-            <Animated.View
-              key={`${a.name}-${i}`}
-              entering={FadeInDown}
-              exiting={FadeOut}
-              layout={LinearTransition}
-              style={styles.appRow}
-              testID={`appliance-row-${i}`}
-            >
-              <MaterialDesignIcons name="fire" size={20} color={colors.brandPrimary} />
-              <Text style={styles.appName} numberOfLines={1}>
-                {a.name}
-              </Text>
-              <Text style={styles.appKw}>{a.power_kw} kW</Text>
-              <Pressable
-                hitSlop={10}
-                testID={`remove-appliance-${i}`}
-                onPress={() => setAppliances((list) => list.filter((_, j) => j !== i))}
-                style={styles.removeBtn}
-              >
-                <MaterialDesignIcons name="close-circle" size={22} color={colors.muted} />
-              </Pressable>
-            </Animated.View>
-          ))}
-          <Pressable
-            testID="add-appliance-button"
-            onPress={() => setModal(true)}
-            style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}
-          >
-            <MaterialDesignIcons name="plus" size={20} color={colors.onBrandTertiary} />
-            <Text style={styles.addText}>Aggiungi apparecchio</Text>
-          </Pressable>
-        </Animated.View>
+        <View style={styles.sectionRow}>
+          <Text style={styles.section}>RETE · {segments.length} {segments.length === 1 ? "TRATTO" : "TRATTI"}</Text>
+          <Text style={styles.total} testID="total-power">
+            {total.toFixed(1)} kW
+          </Text>
+        </View>
+
+        {segments.map((s, i) => (
+          <SegmentCard
+            key={s.id}
+            segment={s}
+            index={i}
+            candidates={segments.slice(0, i)}
+            onAddAppliance={() => setModalSeg(s.id)}
+          />
+        ))}
+
+        <Pressable
+          testID="add-segment-button"
+          onPress={d.addSegment}
+          style={({ pressed }) => [styles.addSegBtn, pressed && { opacity: 0.7 }]}
+        >
+          <MaterialDesignIcons name="source-branch-plus" size={20} color={colors.onSurface} />
+          <Text style={styles.addSegText}>Aggiungi tratto / diramazione</Text>
+        </Pressable>
+        {!valid && (
+          <Text style={styles.hint} testID="form-hint">
+            Inserisci la lunghezza di ogni tratto (max 500 m) e almeno un apparecchio.
+          </Text>
+        )}
       </KeyboardAwareScrollView>
 
       <View style={[styles.ctaWrap, { paddingBottom: bottomChrome + spacing.lg }]}>
@@ -165,7 +149,11 @@ export default function CalculatorScreen() {
         </Pressable>
       </View>
 
-      <ApplianceModal visible={modal} onClose={() => setModal(false)} onAdd={(a) => setAppliances((l) => [...l, a])} />
+      <ApplianceModal
+        visible={modalSeg !== null}
+        onClose={() => setModalSeg(null)}
+        onAdd={(a) => modalSeg && d.addAppliance(modalSeg, a)}
+      />
     </View>
   );
 }
@@ -180,7 +168,35 @@ const useStyles = makeStyles((c) => ({
     borderBottomColor: c.border,
   },
   overline: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2, color: c.brandPrimary },
-  title: { fontSize: 26, fontWeight: "800", color: c.onSurface, marginTop: 2 },
+  title: { fontSize: 26, fontWeight: "800", color: c.onSurface, marginTop: 2, flex: 1 },
+  titleRow: { flexDirection: "row", alignItems: "center" },
+  resetBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  editBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    backgroundColor: c.brandTertiary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    minHeight: 36,
+  },
+  editText: { flex: 1, color: c.onBrandTertiary, fontWeight: "600", fontSize: 13 },
+  editCancel: { color: c.onBrandSecondary, fontWeight: "700", fontSize: 13 },
+  sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", paddingHorizontal: spacing.xs },
+  section: { fontSize: 12, fontWeight: "700", letterSpacing: 1, color: c.muted },
+  addSegBtn: {
+    minHeight: 48,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: c.borderStrong,
+    backgroundColor: c.surfaceSecondary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
+  addSegText: { color: c.onSurface, fontWeight: "600", fontSize: 15 },
   content: { padding: spacing.lg, gap: spacing.lg },
   card: {
     backgroundColor: c.surfaceSecondary,

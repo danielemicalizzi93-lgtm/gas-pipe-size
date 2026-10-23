@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 2: multi-segment network, edit/duplicate, PDF share, installer profile+logo. Backend 38/38 pytest pass (17 new + 21 regression; 1 old regression assertion updated for new segments schema). Frontend (390x844 web preview): calculator multi-segment build (add/remove segment, parent chips, per-segment appliances, total-power, disabled CTA), result segments-table, save with client/address, share-pdf (window.print called, no error), history detail (detail-client, edit w/ banner + 'Aggiorna calcolo' + save-as-new, update persisted, duplicate '(copia)' no banner, detail-pdf, delete), profile save -> 'Profilo salvato' + persisted after reload all PASS. 1 functional bug: editing state survives deletion of the calc being edited. No deprecated Expo packages detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/profile/logo, /api/profile/logo-data", "issue": "_load_logo -> get_object errors (storage down / object missing) are not caught -> raw 500 instead of 404/502 with message. server.py:331-338"},
+      {"endpoint": "POST /api/calculate", "issue": "422 detail for tree errors is Pydantic's 'Value error, ...' wrapper; frontend never surfaces it (result screen only shows generic 'Errore nel calcolo'), e.g. segment length > 500 m or segment name > 60 chars"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "history/[id].tsx delete + draft store", "issue": "Deleting a calculation that is currently loaded for edit does not clear useDraft.editingId. Calcola tab keeps showing 'Modifica: <name>' banner and result screen shows 'Aggiorna calcolo' -> PUT 404 -> 'Salvataggio non riuscito, riprova.' Reproduced in UI. Fix: in del.onSuccess, if useDraft.getState().editingId === id call setEditingId(null) (or reset()).", "testID": "detail-delete / editing-banner / save-button", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "PDF on web", "issue": "expo-print web printAsync ignores the html param and just calls window.print() (node_modules/expo-print/build/ExponentPrint.web.js), so on web the browser prints the current app screen, not the technical report. Native (printToFileAsync + shareAsync) unaffected. Option: on web open a new window with the html and call print there, or use an iframe.", "affected_testIDs": ["share-pdf-button", "detail-pdf"]}
+    ],
+    "design_issues": [
+      {"screen": "Calcola", "issues": [
+        "After saving a NEW calc, result.tsx onSuccess sets editingId -> Calcola tab shows 'Modifica: ...' banner for a calc the user did not choose to edit; confirm this is intended UX",
+        "No client-side validation for length > 500 m / long names (no maxLength on TextInputs: segment name 60, save name 80, client 100, address 200) -> generic errors only",
+        "Default save name sums floats (e.g. 0.1+0.2 -> '0.30000000000000004 m'); round totalLen in result.tsx:27-29",
+        "segment-card iconBtn minWidth 32 (trash/remove icons) below 44pt; hitSlop compensates partially"
+      ]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_segments_profile.py", "/app/backend/tests/test_gas_sizing.py", "/app/test_reports/pytest/pytest_results_iter2.xml"],
+  "action_items": [
+    "Clear draft editingId when the calc being edited is deleted (history/[id].tsx del.onSuccess)",
+    "Web PDF: render the report html in a new window/iframe before print, since expo-print web ignores html",
+    "Catch storage errors in _load_logo and return 404/502 with message",
+    "Add maxLength to segment/save TextInputs and a length<=500 check in calculator 'valid'; surface backend 422 detail on result screen",
+    "Round total length in default calculation name"
+  ],
+  "critical_code_review_comments": [
+    "Tree validation correct: duplicate ids, single root, missing parent, detached cycles and self-parent all rejected (verified)",
+    "Calculation.from_mongo recomputes result on every read; legacy stored docs auto-migrate via legacy_single validator (good)",
+    "Sync requests in object storage wrapped in run_in_threadpool (good); _logo_cache is in-process memory, unbounded but single-logo so OK",
+    "Frontend parent candidates = earlier segments only -> UI cannot create cycles; removeSegment reparents children to removed parent (good)"
+  ],
+  "updated_files": ["/app/backend/tests/test_segments_profile.py (new)", "/app/backend/tests/test_gas_sizing.py (assert input.segments[0].length_m instead of legacy input.length_m)"],
+  "success_rate": {"backend": "100% (38/38)", "frontend": "~95% (all requested flows pass; 1 edit-after-delete bug, web PDF prints app screen)"},
+  "seed_data_creation": "None persisted. TEST_ calculations deleted; profile reset to empty (original state); test logo uploaded then DELETED (has_logo=false).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "No auth. Use tap helper: scrollIntoView({block:'center'}) before force-click, since the absolute 'calculate-button' CTA overlays lower content. Override window.print in add_init_script to count PDF calls on web. Image picker not tested (logo tested via API with PIL-generated PNG).",
+  "rca_of_issue": "Edit-after-delete: loadCalculation(mode='edit') stores editingId in zustand; history detail delete only invalidates queries, so the stale editingId routes save to PUT on a non-existent id (404)."
+}

@@ -132,7 +132,8 @@ class TestCalculationsCRUD:
         got = r.json()
         assert got["id"] == cid
         assert got["name"] == "TEST_appartamento"
-        assert got["input"]["length_m"] == 12
+        # legacy payload is normalized into a single root segment
+        assert got["input"]["segments"][0]["length_m"] == 12
 
         # List includes it
         r = api_client.get(f"{base_url}/api/calculations")
